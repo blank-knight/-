@@ -3,16 +3,7 @@ import pandas as pd
 import math
 
 class CF():
-    '''
-        协同过滤
-    '''
     def __init__(self,user_mx,data) -> None:
-        '''
-            初始化
-            Args:
-                user_mx:用户经纬度矩阵
-                data:预测矩阵
-        '''
         self.user_mx = user_mx
         self.data = data
 
@@ -20,11 +11,6 @@ class CF():
     def calSim(self,userId1,userId2):
         '''
             计算相似度
-            Args:
-                userId1:用户1的id
-                userId2:用户2的id
-            return:
-                返回两者的相似度
         '''
         # 两个用户经纬度矩阵信息
         user1Items,user2Items = self.splicing(userId1,userId2)
@@ -39,10 +25,6 @@ class CF():
     def std(self,mx):
         '''
             矩阵进行标准化，x1/(x1^2+y1^2)^(1/2)
-            Args:
-                mx:需要标准化的矩阵
-            return:
-                返回标准化后的矩阵
         '''
         std_mx = mx*mx
         std_mx[:,0] = np.sqrt(std_mx[:,0]+std_mx[:,1])
@@ -52,11 +34,6 @@ class CF():
     def splicing(self,userId1,userId2):
         '''
             将经纬度列表合并成array
-            Args:
-                userId1:用户1的id
-                userId2:用户2的id
-            return:
-                合并后的np.array数组
         '''
         user1_lati = np.array(self.user_mx.loc[userId1,'latitude']) 
         user1_longi = np.array(self.user_mx.loc[userId1,'longitude']) 
@@ -67,10 +44,7 @@ class CF():
         
     def cf_mae(self,testUserId,tupData): 
         '''
-            计算协同过滤下的MAE误差,并添加进预测矩阵self.data里面
-            Args:
-                testUserId:测试集用户id索引
-                tupData:(用户id,相似度)元组
+            计算协同过滤下的MAE误差
         '''
         # id = 0
         up_latitude,up_longitude,down = 0,0,0
@@ -91,7 +65,6 @@ class CF():
             up_latitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['latitude'])
             up_longitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['longitude'])
         if down == 0:
-            print("down is 0")
             return 0
         la_score = up_latitude/down
         long_score = up_longitude/down
@@ -133,14 +106,14 @@ if __name__ == "__main__":
         trainIndex = train_data.index
         testIndex = test_data.index
        
-        cf_cal = CF(user_mx,data)
+        cf_cal = CF(user_mx)
         topk = 3
         count = 0
         length = len(testIndex)
         start_time = time.time()
         for i in testIndex:
             count += 1
-            print("当前进度是:",count/length)
+            # print("当前进度是:",count/length)
             sim_lis = []
             for j in trainIndex:
                 if i == j:

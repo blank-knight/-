@@ -67,10 +67,7 @@ class CF():
         
     def cf_mae(self,testUserId,tupData): 
         '''
-            计算协同过滤下的MAE误差,并添加进预测矩阵self.data里面
-            Args:
-                testUserId:测试集用户id索引
-                tupData:(用户id,相似度)元组
+            计算协同过滤下的MAE误差
         '''
         # id = 0
         up_latitude,up_longitude,down = 0,0,0
@@ -91,7 +88,6 @@ class CF():
             up_latitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['latitude'])
             up_longitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['longitude'])
         if down == 0:
-            print("down is 0")
             return 0
         la_score = up_latitude/down
         long_score = up_longitude/down

@@ -90,7 +90,7 @@ class LSH():
         res = (userId2,1/(1+math.sqrt(np.sum(self.vec_encrypt.mx_decrypt((c1-c2),S,w)**2))/user1Items.shape[0])) 
         end_time = time.time()
         total_time += (end_time-start_time)
-        return res,total_time
+        return res
 
     def mx_encrypt(self,mx,w,m,n,T):
         '''
@@ -182,12 +182,7 @@ class LSH():
 
     def lsh_table(self,data,plane_norms_groups,nbits,num):
         '''
-            进行hash映射,构建哈希表
-            Args:
-                data:进行哈希映射的数据
-                plane_norms_groups:哈希映射函数
-                nbits:哈希编码数
-                num:哈希表的表数
+            进行hash映射，hash后返回的用户索引是随机的，没有顺序的
         '''
         # print("当前的nbits为:",nbits)
         value = data.values
@@ -247,7 +242,6 @@ class LSH():
             up_latitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['latitude'])
             up_longitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['longitude'])
         if down == 0:
-            print("down is 0")
             return 0
         la_score = up_latitude/down
         long_score = up_longitude/down

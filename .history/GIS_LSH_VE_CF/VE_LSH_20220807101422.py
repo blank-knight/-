@@ -90,7 +90,7 @@ class LSH():
         res = (userId2,1/(1+math.sqrt(np.sum(self.vec_encrypt.mx_decrypt((c1-c2),S,w)**2))/user1Items.shape[0])) 
         end_time = time.time()
         total_time += (end_time-start_time)
-        return res,total_time
+        return res
 
     def mx_encrypt(self,mx,w,m,n,T):
         '''
@@ -247,7 +247,6 @@ class LSH():
             up_latitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['latitude'])
             up_longitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['longitude'])
         if down == 0:
-            print("down is 0")
             return 0
         la_score = up_latitude/down
         long_score = up_longitude/down

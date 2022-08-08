@@ -247,7 +247,6 @@ class LSH():
             up_latitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['latitude'])
             up_longitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['longitude'])
         if down == 0:
-            print("down is 0")
             return 0
         la_score = up_latitude/down
         long_score = up_longitude/down

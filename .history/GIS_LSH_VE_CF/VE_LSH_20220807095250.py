@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""
-    局部敏感哈希和加密局部敏感哈希的实现
-"""
+'''
+    第一种加密方案得嵌入，失败，运行时间太久。
+'''
 from pickletools import read_uint1
 from tracemalloc import start
 from grapheme import length
@@ -29,17 +29,7 @@ def time_cal(func):
     return inner
 
 class LSH():
-    """
-        局部敏感哈希的实现
-    """
     def __init__(self,user_mx,data,vec_encrypt=None) -> None:
-            '''
-                初始化
-                Args:
-                    user_mx:用户经纬度矩阵
-                    data:预测矩阵
-                    vec_encrypt:加密算法实例化对象
-            '''
             self.user_mx = user_mx
             self.data = data
             self.vec_encrypt = vec_encrypt
@@ -48,11 +38,6 @@ class LSH():
     def calSim(self,userId1,userId2):
         '''
             计算相似度
-            Args:
-                userId1:用户1的id
-                userId2:用户2的id
-            return:
-                返回两者的相似度
         '''
         # 两个用户经纬度矩阵信息
         user1Items,user2Items = self.splicing(userId1,userId2)
@@ -65,12 +50,7 @@ class LSH():
 
     def encrypt_calSim(self,userId1,userId2):
         '''
-            计算加密后的相似度
-            Args:
-                userId1:用户1的id
-                userId2:用户2的id
-            return:
-                返回两者的相似度
+            计算相似度
         '''
         # 两个用户经纬度矩阵信息
         start_time = time.time()
@@ -90,22 +70,11 @@ class LSH():
         res = (userId2,1/(1+math.sqrt(np.sum(self.vec_encrypt.mx_decrypt((c1-c2),S,w)**2))/user1Items.shape[0])) 
         end_time = time.time()
         total_time += (end_time-start_time)
-        return res,total_time
+        return res
 
     def mx_encrypt(self,mx,w,m,n,T):
         '''
             对矩阵进行预处理加密
-            Args:
-                S 表示密钥/私钥的矩阵。用于解密。
-                M 公钥。用于加密和进行数学运算。在有些算法中，不是所有数学运算都需要公钥。但这一算法非常广泛地使用公钥。
-                c 加密数据向量，密文。
-                x 消息，即明文。有些论文使用m作明文的变量名。
-                w 单个“加权（weighting）”标量变量，用于重加权输入消息x（让它一致地更长或更短）。这一变量用于调节信噪比。加强信号后，对于给定的操作而言，
-                消息较不容易受噪声影响。然而，过于加强信号，会增加完全毁坏数据的概率。这是一个平衡。
-                E或e 一般指随机噪声。在某些情形下，指用公钥加密数据前添加的噪声。一般而言，噪声使解密更困难。噪声使同一消息的两次加密可以不一样，
-                在让消息难以破解方面，这很重要。注意，取决于算法和实现，这可能是一个向量，也可能是一个矩阵。在其他情形下，指随操作积累的噪声，详见后文。
-            return:
-                c*和S*
         '''
         mx_tem = mx*1e+7
         mx_tem = mx_tem.T.astype(int)
@@ -115,10 +84,6 @@ class LSH():
     def std(self,mx):
         '''
             矩阵进行标准化，x1/(x1^2+y1^2)^(1/2)
-            Args:
-                mx:需要标准化的矩阵
-            return:
-                返回标准化后的矩阵
         '''
         std_mx = mx*mx
         std_mx[:,0] = np.sqrt(std_mx[:,0]+std_mx[:,1])
@@ -128,11 +93,6 @@ class LSH():
     def splicing(self,userId1,userId2):
         '''
             将经纬度列表合并成array
-            Args:
-                userId1:用户1的id
-                userId2:用户2的id
-            return:
-                合并后的np.array数组
         '''
         user1_lati = np.array(self.user_mx.loc[userId1,'latitude']) 
         user1_longi = np.array(self.user_mx.loc[userId1,'longitude']) 
@@ -149,10 +109,6 @@ class LSH():
     def lsh_detect(self,lsh_table):
         '''
             统计lshTable里各个桶的用户数。返回统计结果字典
-            Args:
-                lsh_table:哈希表
-            return:
-                哈希表的分布情况字典
         '''
         detect_dic = {}
         table_num = 0
@@ -165,13 +121,8 @@ class LSH():
 
     def hash_function(self,num=4,nbits=8,d=2):
         '''
-            构建LSH哈希映射函数,
-            Args:
-                d:数据维度
-                nbits:编码后的bit位数
-                num:哈希表个数，采用均匀分布
-            return:
-                哈希映射函数
+            构建LSH哈希映射函数，d:数据维度，nbits:编码后的bit位数，num:哈希表个数，采用均匀分布
+            注意：这里的np.random.rand产生的随机数是一样的，伪随机，建议设置随机数种子试试
         '''
         plane_norms_groups = np.empty([num,nbits,d])
         for i in range(num):
@@ -182,12 +133,7 @@ class LSH():
 
     def lsh_table(self,data,plane_norms_groups,nbits,num):
         '''
-            进行hash映射,构建哈希表
-            Args:
-                data:进行哈希映射的数据
-                plane_norms_groups:哈希映射函数
-                nbits:哈希编码数
-                num:哈希表的表数
+            进行hash映射，hash后返回的用户索引是随机的，没有顺序的
         '''
         # print("当前的nbits为:",nbits)
         value = data.values
@@ -223,10 +169,7 @@ class LSH():
 
     def lsh_mae(self,testUserId,tupData): 
         '''
-            计算协同过滤下的MAE误差,并添加进预测矩阵self.data里面
-            Args:
-                testUserId:测试集用户id索引
-                tupData:(用户id,相似度)元组
+            计算协同过滤下的MAE误差
         '''
         # id = 0
         up_latitude,up_longitude,down = 0,0,0
@@ -247,7 +190,6 @@ class LSH():
             up_latitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['latitude'])
             up_longitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['longitude'])
         if down == 0:
-            print("down is 0")
             return 0
         la_score = up_latitude/down
         long_score = up_longitude/down
