@@ -251,22 +251,15 @@ class LSH():
             return 0
         la_score = up_latitude/down
         long_score = up_longitude/down
-        if self.data.loc[i,'predict_latitude'] == 0:
-            self.data.loc[i,'predict_latitude'] = la_score
-            self.data.loc[i,'predict_longitude'] = long_score
-            self.data.loc[i,'la_MAE'] = self.sig_mae(self.data.loc[i,'latitude'],self.data.loc[i,'predict_latitude'])
-            self.data.loc[i,'long_MAE'] = self.sig_mae(self.data.loc[i,'longitude'],self.data.loc[i,'predict_longitude'])
-        
-            # 这里需要修改判别准则，应该改为MAE判别
-        else:
-            tem = self.sig_mae(la_score,self.data.loc[i,'latitude'])
-            if tem < self.data.loc[i,'la_MAE']:
-                self.data.loc[i,'predict_latitude'] = la_score 
-                self.data.loc[i,'la_MAE'] = tem
-            tem = self.sig_mae(long_score,self.data.loc[i,'longitude'])
-            if tem < self.data.loc[i,'long_MAE']:
-                self.data.loc[i,'predict_latitude'] = long_score 
-                self.data.loc[i,'long_MAE'] = tem   
+
+        tem = self.sig_mae(la_score,self.data.loc[i,'latitude'])
+        if tem < self.data.loc[i,'la_MAE']:
+            self.data.loc[i,'predict_latitude'] = la_score 
+            self.data.loc[i,'la_MAE'] = tem
+        tem = self.sig_mae(long_score,self.data.loc[i,'longitude'])
+        if tem < self.data.loc[i,'long_MAE']:
+            self.data.loc[i,'predict_latitude'] = long_score 
+            self.data.loc[i,'long_MAE'] = tem   
 
 import time
 if __name__ == "__main__":
@@ -288,7 +281,7 @@ if __name__ == "__main__":
                         continue
                 for test_id in te_lshTable[num][buckets]: # 遍历当前表当前桶里的测试集用户和训练集用户
                     count += 1
-                    print("当前进度是:",count/length)
+                    # print("当前进度是:",count/length)
                     sim_lis = []
                     
                     for train_id in lshTable[num][buckets]: # 遍历训练集hash映射后同一个表，同一个桶下的数据
@@ -298,7 +291,11 @@ if __name__ == "__main__":
             la_mae = data['la_MAE'].mean()# 所有的MAE求平均最后
             long_mae = data['long_MAE'].mean() # 所有的MAE求平均最后
             mean_mae = (la_mae+long_mae)/2
+            print('测试集long_mae为%.2f'%long_mae)
+            print('测试集la_mae为%.2f'%la_mae)
             print('测试集mean_mae为%.2f'%mean_mae)
+            path = "../GIS_LSH_VE_CF/data/"+str(num)
+            data.to_csv(path)
         end_time = time.time()
         # la_mae = data['la_MAE'].mean()# 所有的MAE求平均最后
         # long_mae = data['long_MAE'].mean() # 所有的MAE求平均最后
@@ -310,9 +307,9 @@ if __name__ == "__main__":
         # print('测试集mean_mae为%.2f'%mean_mae)
         return mean_mae,end_time-start_time
 
-    original_data = pd.read_table('./GIS_LSH_VE_CF/data/train.csv',sep=",",names=['latitude','longitude'],encoding='latin-1',engine='python')
-    user_mx = pd.read_table('./GIS_LSH_VE_CF/data/user_mx.csv',sep=",",names=['latitude','longitude'],encoding='latin-1',engine='python')
-    test_data = pd.read_table('./GIS_LSH_VE_CF/data/test.csv',sep=",",names=['latitude','longitude'],encoding='latin-1',engine='python')
+    original_data = pd.read_table('../GIS_LSH_VE_CF/data/train.csv',sep=",",names=['latitude','longitude'],encoding='latin-1',engine='python')
+    user_mx = pd.read_table('../GIS_LSH_VE_CF/data/user_mx.csv',sep=",",names=['latitude','longitude'],encoding='latin-1',engine='python')
+    test_data = pd.read_table('../GIS_LSH_VE_CF/data/test.csv',sep=",",names=['latitude','longitude'],encoding='latin-1',engine='python')
     data = test_data.groupby(test_data.index).mean()
     # data['predict_latitude'],data['predict_longitude'],data['la_MAE'],data['long_MAE'] = 0,0,0,0
     # data = pd.read_table('./GIS_LSH_VE_CF/data/predict_data.csv',sep=",",names=['latitude','longitude','predict_latitude','predict_longitude','la_MAE','long_MAE'],encoding='latin-1',engine='python')
@@ -326,43 +323,47 @@ if __name__ == "__main__":
     data_item = [2000]
     # 参数设置
     mae,times,total_time = [],[],0
-    nbits,num_lis,d = 20,[2],2
+    nbits_lis,num_lis,d = [10,20,30,40,50,60,70,80,90,100],2,2
     # 实例化
     vec_encrypt = vector_encrypt()
     lsh_cal = LSH(user_mx,data,vec_encrypt)
     start = 0
+    num = num_lis
     for i in data_item:
         train_data = original_data.iloc[start:i]
-        for num in num_lis:
-            data['predict_latitude'],data['predict_longitude'],data['la_MAE'],data['long_MAE'] = 0,0,0,0
+        for nbits in nbits_lis:
+            data['predict_latitude'],data['predict_longitude'],data['la_MAE'],data['long_MAE'] = 0,0,data['latitude'],data['longitude'].abs()
+            # print(data)
             hash_func = lsh_cal.hash_function(num,nbits,d) # hash映射函数
             lshTable = lsh_cal.lsh_table(train_data,hash_func,nbits,num) # 构建hash表
             te_lshTable = lsh_cal.lsh_table(test_data,hash_func,nbits,num)
-
+            
             lsh_mean_mae,lsh_time = train_LSH(train_data,test_data,user_mx)
             mae.append(lsh_mean_mae)
             times.append(lsh_time)
-        start += 2000
+            print("++++++++++++++这是分割线+++++++++++++")
+        # start += 2000
 
-    # print("mae:",mae)
-    # print("times:",times)
-    # data.to_csv("./GIS_LSH_VE_CF/data/predict_data.csv")
-    # style = ["*","o","^","s","X","<",">","p","h","1","2"]
-    # plt.figure(1 , figsize = (17 , 9) )
-    # plt.subplot(121)
-    # plt.plot(num_lis,mae,marker=style[0],markersize=14)
-    # plt.xlabel("tables")
-    # plt.ylabel("MAE")
-    # plt.title("LSH误差随tables的变化")
+    
+    print("mae:",mae)
+    print("times:",times)
+    # data.to_csv("../GIS_LSH_VE_CF/data/predict_data.csv")
+    style = ["*","o","^","s","X","<",">","p","h","1","2"]
+    plt.figure(1 , figsize = (7 , 3) )
 
-    # plt.subplot(122)
-    # plt.plot(num_lis,times,marker=style[1],markersize=14)
-    # plt.xlabel("tables")
-    # plt.ylabel("时间")
-    # plt.title("LSH时间随tables的变化")
-    # fig=plt.gcf()
-    # fig.savefig('./GIS_LSH_VE_CF/picture/LSH_num.jpg',dpi=500)
-    # plt.show()
+    plt.subplot(121)
+    plt.plot(nbits_lis,mae,color = 'k',marker=style[0],markersize=9)
+    plt.xlabel("buckets")
+    plt.ylabel("MAE")
+    plt.title("LSH误差随buckets的变化")
+    plt.subplot(122)
+    plt.plot(nbits_lis,times,color = 'k',marker=style[1],markersize=9)
+    plt.xlabel("buckets")
+    plt.ylabel("时间")
+    plt.title("LSH时间随buckets的变化")
+    fig=plt.gcf()
+    fig.savefig('../GIS_LSH_VE_CF/bw_picture/LSH_nbits_time_MAE1.jpg',dpi=500)
+    plt.show()
 
 
 

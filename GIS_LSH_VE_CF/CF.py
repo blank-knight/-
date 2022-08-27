@@ -95,22 +95,15 @@ class CF():
             return 0
         la_score = up_latitude/down
         long_score = up_longitude/down
-        if self.data.loc[i,'predict_latitude'] == 0:
-            self.data.loc[i,'predict_latitude'] = la_score
-            self.data.loc[i,'predict_longitude'] = long_score
-            self.data.loc[i,'la_MAE'] = self.sig_mae(self.data.loc[i,'latitude'],self.data.loc[i,'predict_latitude'])
-            self.data.loc[i,'long_MAE'] = self.sig_mae(self.data.loc[i,'longitude'],self.data.loc[i,'predict_longitude'])
-        
-            # 这里需要修改判别准则，应该改为MAE判别
-        else:
-            tem = self.sig_mae(la_score,self.data.loc[i,'latitude'])
-            if tem < self.data.loc[i,'la_MAE']:
-                self.data.loc[i,'predict_latitude'] = la_score 
-                self.data.loc[i,'la_MAE'] = tem
-            tem = self.sig_mae(long_score,self.data.loc[i,'longitude'])
-            if tem < self.data.loc[i,'long_MAE']:
-                self.data.loc[i,'predict_latitude'] = long_score 
-                self.data.loc[i,'long_MAE'] = tem   
+            
+        tem = self.sig_mae(la_score,self.data.loc[i,'latitude'])
+        if tem < self.data.loc[i,'la_MAE']:
+            self.data.loc[i,'predict_latitude'] = la_score 
+            self.data.loc[i,'la_MAE'] = tem
+        tem = self.sig_mae(long_score,self.data.loc[i,'longitude'])
+        if tem < self.data.loc[i,'long_MAE']:
+            self.data.loc[i,'predict_latitude'] = long_score 
+            self.data.loc[i,'long_MAE'] = tem   
 
     def sig_mae(self,x,y):
         '''
@@ -159,11 +152,11 @@ if __name__ == "__main__":
         print('测试集mean_mae为%.2f'%mean_mae)
         return mean_mae,end_time-start_time
 
-    original_data = pd.read_table('./GIS_LSH_VE_CF/data/train.csv',sep=",",names=['latitude','longitude'],encoding='latin-1',engine='python')
-    user_mx = pd.read_table('./GIS_LSH_VE_CF/data/user_mx.csv',sep=",",names=['latitude','longitude'],encoding='latin-1',engine='python')
-    test_data = pd.read_table('./GIS_LSH_VE_CF/data/test.csv',sep=",",names=['latitude','longitude'],encoding='latin-1',engine='python')
+    original_data = pd.read_table('../GIS_LSH_VE_CF/data/train.csv',sep=",",names=['latitude','longitude'],encoding='latin-1',engine='python')
+    user_mx = pd.read_table('../GIS_LSH_VE_CF/data/user_mx.csv',sep=",",names=['latitude','longitude'],encoding='latin-1',engine='python')
+    test_data = pd.read_table('../GIS_LSH_VE_CF/data/test.csv',sep=",",names=['latitude','longitude'],encoding='latin-1',engine='python')
     data = test_data.groupby(test_data.index).mean()
-    data['predict_latitude'],data['predict_longitude'],data['la_MAE'],data['long_MAE'] = 0,0,0,0
+    data['predict_latitude'],data['predict_longitude'],data['la_MAE'],data['long_MAE'] = 0,0,data['latitude'],data['longitude'].abs()
     # data = pd.read_table('./GIS_LSH_VE_CF/data/predict_data.csv',sep=",",names=['latitude','longitude','predict_latitude','predict_longitude','la_MAE','long_MAE'],encoding='latin-1',engine='python')
     # print(data)
     # 对用户矩阵进行预处理，将str转换为list
@@ -172,7 +165,7 @@ if __name__ == "__main__":
     user_mx['latitude'] = user_mx['latitude'].apply(to_list)
     user_mx['longitude'] = user_mx['longitude'].apply(to_list)
     #构造500,1000,1500,2000,2500个用户的数据采样
-    data_item = [2000,4000,6000,8000,10000]
+    data_item = [2000,4000]
     mae = []
     times = []
     total_time = 0
@@ -187,20 +180,20 @@ if __name__ == "__main__":
 
     print("mae:",mae)
     print("times:",times)
-    data.to_csv("./GIS_LSH_VE_CF/data/predict_data.csv")
+    #data.to_csv("./GIS_LSH_VE_CF/data/predict_data.csv")
     style = ["*","o","^","s","X","<",">","p","h","1","2"]
-    plt.figure(1 , figsize = (17 , 9) )
-    plt.subplot(121)
-    plt.plot(data_item,mae,marker=style[0],markersize=14)
+    plt.figure(1 , figsize = (10 , 7) )
+    plt.plot(data_item,mae,color = 'k',marker=style[0],markersize=14)
     plt.xlabel("数据量")
     plt.ylabel("MAE")
     plt.title("CF")
+    fig=plt.gcf()
+    fig.savefig('../GIS_LSH_VE_CF/picture/CF1.jpg',dpi=500)
 
-    plt.subplot(122)
-    plt.plot(data_item,times,marker=style[1],markersize=14)
+    plt.figure(2 , figsize = (10 , 7) )
+    plt.plot(data_item,times,color = 'k',marker=style[1],markersize=14)
     plt.xlabel("数据量")
     plt.ylabel("时间")
     plt.title("CF")
-    fig=plt.gcf()
-    fig.savefig('./GIS_LSH_VE_CF/picture/CF.jpg',dpi=500)
+    fig.savefig('../GIS_LSH_VE_CF/picture/CF2.jpg',dpi=500)
     plt.show()
