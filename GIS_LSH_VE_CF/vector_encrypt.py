@@ -1,4 +1,7 @@
 import numpy as np
+'''
+    优化中间密钥传输矩阵M
+'''
 class vector_encrypt:
     '''
         S 表示密钥/私钥的矩阵。用于解密。

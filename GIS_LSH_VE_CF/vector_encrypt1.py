@@ -1,4 +1,8 @@
+
 import numpy as np
+'''
+    中间传输M矩阵版本
+'''
 class vector_encrypt:
     '''
         S 表示密钥/私钥的矩阵。用于解密。
@@ -14,6 +18,9 @@ class vector_encrypt:
         pass
 
     def generate_key(self,w,m,n):
+        '''
+            返回密钥矩阵S    
+            '''
         S = (np.random.rand(m,n) * w / (2 ** 16)) # 可证明 max(S) < w
         return S
 
@@ -31,18 +38,26 @@ class vector_encrypt:
         '''
             传入矩阵和加密算法对象，返回加密后的矩阵和密钥
         '''
-        encrypt_mx = np.zeros([2,mx.shape[1]+1])
-        c,S = self.encrypt_via_switch(mx[0,:],w,m,n,T)
-        encrypt_mx[0,:] = c
-        c,S = self.encrypt_via_switch(mx[1,:],w,m,n,T)
-        encrypt_mx[1,:] = c
-        return encrypt_mx,S
+        encrypt_mx,M = [],[]
+        c_star,M1,S_prime = self.encrypt_via_switch(mx[0,:],w,m,n,T)
+        encrypt_mx.append(c_star)
+        M.append(M1)
+        c_star,M2,S_prime = self.encrypt_via_switch(mx[1,:],w,m,n,T)
+        encrypt_mx.append(c_star)
+        M.append(M2)
+        return encrypt_mx,M,S_prime
 
 
-    def mx_decrypt(self,c,S,w):
+    def mx_decrypt(self,c_star1,c_star2,M1,M2,S,w):
         '''
             传入加密矩阵，密钥和权重，返回解密矩阵
         '''
+        c_prime1 = np.zeros([2,M1[0].shape[0]])
+        c_prime2 = c_prime1
+        for i in range(2):
+            c_prime1[i,:] = M1[i].dot(c_star1[i])
+            c_prime2[i,:] = M2[i].dot(c_star2[i])
+        c = c_prime1-c_prime2
         decrypt_mx = np.zeros([2,c.shape[1]-1])
         decrypt_mx[0,:] = (S.dot(c[0,:]) / w).astype('int')
         decrypt_mx[1,:] = (S.dot(c[1,:]) / w).astype('int')
@@ -61,17 +76,20 @@ class vector_encrypt:
         return c_star
 
     def switch_key(self,c,S,m,n,T):
-        l = int(np.ceil(np.log2(np.max(np.abs(c)))))
+        '''
+            返回c'和S'
+        '''
+        l = int(np.ceil(np.log2(np.max(np.abs(c))))) # np.ceil:返回大于该值的最小整数
         c_star = self.get_c_star(c,m,l)
         S_star = self.get_S_star(S,m,n,l)
         n_prime = n + 1
 
-        S_prime = np.concatenate((np.eye(m),T.T),0).T
+        S_prime = np.concatenate((np.eye(m),T.T),0).T # np.concatenate()是用来对数列或矩阵进行合并的
         A = (np.random.rand(n_prime - m, n*l) * 10).astype('int')
         E = (1 * np.random.rand(S_star.shape[0],S_star.shape[1])).astype('int')
         M = np.concatenate(((S_star - T.dot(A) + E),A),0)
-        c_prime = M.dot(c_star)
-        return c_prime,S_prime
+        #c_prime = M.dot(c_star)
+        return c_star,M,S_prime
 
     def get_S_star(self,S,m,n,l):
         '''
@@ -95,8 +113,8 @@ class vector_encrypt:
         '''
             返回c',S'
         '''
-        c,S = self.switch_key(x*w,np.eye(m),m,n,T)
-        return c,S
+        c_star,M,S_prime = self.switch_key(x*w,np.eye(m),m,n,T)
+        return c_star,M,S_prime
 
 if __name__ == '__main__':
     import math
@@ -149,9 +167,10 @@ if __name__ == '__main__':
     S = vec_encrypt.generate_key(w,m,n)
     T = vec_encrypt.get_T(n)
     # c,S = vec_encrypt.encrypt_via_switch(x,w,m,n,T)
-    c1,S = vec_encrypt.mx_encrypt(x,w,m,n,T)
+    c_star1,M1,S_prime = vec_encrypt.mx_encrypt(x,w,m,n,T)
     x = user1Items2_tem
-    c2,S = vec_encrypt.mx_encrypt(x,w,m,n,T)
+    c_star2,M2,S_prime = vec_encrypt.mx_encrypt(x,w,m,n,T)
+    # print(c_star2-c_star1)
     # print(vec_encrypt.mx_decrypt(c,S,w))
     # print(user1Items1_tem[0])
     # vec_encrypt = vector_encrypt()
@@ -164,4 +183,4 @@ if __name__ == '__main__':
     # c,S = vec_encrypt.encrypt_via_switch(x,w,m,n,T)
     # print(vec_encrypt.decrypt(c,S,w))
     print(1/(1+math.sqrt(np.sum(((user1Items1_tem-user1Items2_tem)/1e+7)**2)/user1Items2_tem.shape[1])))
-    print(1/(1+math.sqrt(np.sum((vec_encrypt.mx_decrypt((c1-c2),S,w)/1e+7)**2)/user1Items2_tem.shape[1])))
+    print(1/(1+math.sqrt(np.sum((vec_encrypt.mx_decrypt(c_star1,c_star2,M1,M2,S_prime,w)/1e+7)**2)/user1Items2_tem.shape[1])))
