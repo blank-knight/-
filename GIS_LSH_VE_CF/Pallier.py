@@ -91,7 +91,7 @@ class Pallier:
 
 if __name__ == "__main__":
     test = Pallier()
-    m = "dsdad"
+    m = 8800000
     gLambda,gMu = test.private_key()
     cipher = test.encrypt(m)
     mess = test.decrypt(cipher,gLambda,gMu)
