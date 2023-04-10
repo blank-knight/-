@@ -69,17 +69,17 @@ class vector_encrypt:
         '''
         c_star = np.zeros(l * m,dtype='int')
         for i in range(m):
-            b = np.array(list(np.binary_repr(np.abs(c[i]))),dtype='int')
+            b = np.array(list(np.binary_repr(np.abs(c[i]))),dtype='int') # 对c[i]取绝对值然后返回二进制的形式
             if(c[i] < 0):
                 b *= -1
-            c_star[(i * l) + (l-len(b)): (i+1) * l] += b
+            c_star[(i * l) + (l-len(b)): (i+1) * l] += b # 对整个C*长编码，截取位置进行赋值
         return c_star
 
     def switch_key(self,c,S,m,n,T):
         '''
             返回c'和S'
         '''
-        l = int(np.ceil(np.log2(np.max(np.abs(c))))) # np.ceil:返回大于该值的最小整数
+        l = int(np.ceil(np.log2(np.max(np.abs(c))))) # np.ceil:返回大于该值的最小整数，这里返回最大数的最长编码
         c_star = self.get_c_star(c,m,l)
         S_star = self.get_S_star(S,m,n,l)
         n_prime = n + 1

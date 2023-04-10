@@ -15,6 +15,7 @@ import time
 from K_means_train import K_means_trian
 from vector_encrypt import vector_encrypt
 import math
+from laplace_dp import laplace_dp
 
 
 def time_cal(func):
@@ -45,20 +46,26 @@ class LSH():
             self.vec_encrypt = vec_encrypt
 
 
-    def calSim(self,userId1,userId2):
+    def calSim(self,userId1,userId2,is_laplace = False):
         '''
             计算相似度
             Args:
                 userId1:用户1的id
                 userId2:用户2的id
+                is_laplace:是否加入拉普拉斯噪声，进行模糊处理
             return:
                 返回两者的相似度
         '''
+        global laplaceDp
         # 两个用户经纬度矩阵信息
         user1Items,user2Items = self.splicing(userId1,userId2)
         #两个物品共同用户
         user1Items = self.std(user1Items.astype('float'))
         user2Items = self.std(user2Items.astype('float'))
+        if(is_laplace):
+            # 这里拉普拉斯噪声参数选择为1/1000，1为敏感度，1000为epsilon
+            user1Items = laplaceDp.laplace_mech(user1Items,1,10)
+            user2Items = laplaceDp.laplace_mech(user2Items,1,10)
         # print("当前用户是:{0}和{1}".format(userId1,userId2))
         res = (userId2,1/(1+math.sqrt(np.sum((user1Items-user2Items)**2))/user1Items.shape[0])) 
         return res
@@ -103,7 +110,7 @@ class LSH():
                 w 单个“加权（weighting）”标量变量，用于重加权输入消息x（让它一致地更长或更短）。这一变量用于调节信噪比。加强信号后，对于给定的操作而言，
                 消息较不容易受噪声影响。然而，过于加强信号，会增加完全毁坏数据的概率。这是一个平衡。
                 E或e 一般指随机噪声。在某些情形下，指用公钥加密数据前添加的噪声。一般而言，噪声使解密更困难。噪声使同一消息的两次加密可以不一样，
-                在让消息难以破解方面，这很重要。注意，取决于算法和实现，这可能是一个向量，也可能是一个矩阵。在其他情形下，指随操作积累的噪声，详见后文。
+                在让消息难以破解方面，这很重要。注意，取决于算法和实现，这可能是一个向量，也可能是一个矩阵。在其他情形下，指随操作积累的噪声。
             return:
                 c*和S*
         '''
@@ -327,6 +334,7 @@ if __name__ == "__main__":
     # 实例化
     vec_encrypt = vector_encrypt()
     lsh_cal = LSH(user_mx,data,vec_encrypt)
+    laplaceDp = laplace_dp()
     start = 0
     num = num_lis
     for i in data_item:
