@@ -16,14 +16,16 @@
   注意：所有用户应使用同一个E2LSH且只使用一张哈希表，从而避免一个用户映射到多个哈希桶，或者最后映射的值不对等问题。
 
 ## 代码文件说明
-CF.py 协同过滤实现
-K_means_train.py 使用K-means优化LSH的实现
-Paillier_mx.py 对Paillier用矩阵进行遍历尝试
-Paillier.py Paillier的实现
-VE_LSH LSH和加密的实现
-K_means.ipynb 使用K-means优化LSH的尝试
-laplace_dp 使用拉普拉斯噪声模糊数据
-main.ipynb 整体运行
-pre_treat.ipynb 数据预处理
-vector_encrypt.ipynb 格加密的实现
+
+- CF.py 协同过滤实现
+- K_means_train.py 使用K-means优化LSH的实现
+- Paillier_mx.py 对Paillier用矩阵进行遍历尝试
+- Paillier.py Paillier的实现
+- VE_LSH LSH和加密的实现
+- K_means.ipynb 使用K-means优化LSH的尝试
+- laplace_dp 使用拉普拉斯噪声模糊数据
+- main.ipynb 整体运行
+- pre_treat.ipynb 数据预处理
+- vector_encrypt.ipynb 格加密的实现
+
 算法核心代码还整理在了在另一个仓库“基于格的隐私保护推荐算法”里面，这个里也有，但可能比较乱。
