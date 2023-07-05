@@ -4,18 +4,17 @@
 """
 from pickletools import read_uint1
 from tracemalloc import start
-from grapheme import length
 from matplotlib import style
 import numpy as np
-from numba import jit
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.metrics import mean_absolute_error as MAE
 import time
 from K_means_train import K_means_trian
 from vector_encrypt import vector_encrypt
 import math
 from laplace_dp import laplace_dp
+from Paillier_mx import Paillier
+import random
 
 
 def time_cal(func):
@@ -33,20 +32,32 @@ class LSH():
     """
         局部敏感哈希的实现
     """
-    def __init__(self,user_mx,data,vec_encrypt=None) -> None:
+    def __init__(self,user_mx,data,vec_encrypt=None,laplaceDP=None) -> None:
             '''
-                初始化
+                初始化,生成加密算法需要的参数
                 Args:
                     user_mx:用户经纬度矩阵
                     data:预测矩阵
                     vec_encrypt:加密算法实例化对象
             '''
+            self.pailler = Paillier()
+            self.lapDP = laplaceDP
             self.user_mx = user_mx
             self.data = data
             self.vec_encrypt = vec_encrypt
+            self.m = 2
+            self.n =self.m
+            self.w = 16
+            self.S = self.vec_encrypt.generate_key(self.w,self.m,self.n)
+            self.T = self.vec_encrypt.get_T(self.n)
+            self.x = np.array(np.array([ 0.29908732,-0.95422575]))*1e+7
+            self.x = self.x.T.astype(int)
+            self.M,self.l = vec_encrypt.switch_key(self.x*self.w,np.eye(self.m),self.m,self.n,self.T)
+            self.gLambda,self.gMu = self.pailler.private_key()
 
 
-    def calSim(self,userId1,userId2,is_laplace = False):
+
+    def calSim(self,userId1,userId2,is_laplace = False,is_paillier = False):
         '''
             计算相似度
             Args:
@@ -56,7 +67,6 @@ class LSH():
             return:
                 返回两者的相似度
         '''
-        global laplaceDp
         # 两个用户经纬度矩阵信息
         user1Items,user2Items = self.splicing(userId1,userId2)
         #两个物品共同用户
@@ -64,8 +74,10 @@ class LSH():
         user2Items = self.std(user2Items.astype('float'))
         if(is_laplace):
             # 这里拉普拉斯噪声参数选择为1/1000，1为敏感度，1000为epsilon
-            user1Items = laplaceDp.laplace_mech(user1Items,1,10)
-            user2Items = laplaceDp.laplace_mech(user2Items,1,10)
+            user1Items = self.lapDP.laplace_mech(user1Items,1,10)
+            user2Items = self.lapDP.laplace_mech(user2Items,1,10)
+        if(is_paillier):
+            self.pailler.mx_encrypt(self.gLambda,self.gMu,user1Items,user2Items)
         # print("当前用户是:{0}和{1}".format(userId1,userId2))
         res = (userId2,1/(1+math.sqrt(np.sum((user1Items-user2Items)**2))/user1Items.shape[0])) 
         return res
@@ -85,21 +97,16 @@ class LSH():
         user1Items = self.std(user1Items.astype('float'))
         user2Items = self.std(user2Items.astype('float'))
         end_time = time.time()
-        m = user1Items.shape[0]
-        n = m
-        w = 16
-        S = self.vec_encrypt.generate_key(w,m,n)
-        T = self.vec_encrypt.get_T(n)
-        c1,S = self.mx_encrypt(user1Items,w,m,n,T)
-        c2,S = self.mx_encrypt(user2Items,w,m,n,T)
+        c1,S = self.mx_encrypt(user1Items,self.w,self.M,self.m,self.l,self.T)
+        c2,S = self.mx_encrypt(user2Items,self.w,self.M,self.m,self.l,self.T)
         total_time = end_time-start_time
         start_time = time.time()
-        res = (userId2,1/(1+math.sqrt(np.sum(self.vec_encrypt.mx_decrypt((c1-c2),S,w)**2))/user1Items.shape[0])) 
+        res = (userId2,1/(1+math.sqrt(np.sum(self.vec_encrypt.mx_decrypt((c1-c2),S,self.w)**2))/user1Items.shape[0])) 
         end_time = time.time()
         total_time += (end_time-start_time)
         return res,total_time
 
-    def mx_encrypt(self,mx,w,m,n,T):
+    def mx_encrypt(self,mx,w,M,m,l,T):
         '''
             对矩阵进行预处理加密
             Args:
@@ -116,7 +123,7 @@ class LSH():
         '''
         mx_tem = mx*1e+7
         mx_tem = mx_tem.T.astype(int)
-        c,S = self.vec_encrypt.mx_encrypt(mx_tem,w,m,n,T)
+        c,S = self.vec_encrypt.mx_encrypt(mx_tem,w,M,m,l,T)
         return c,S
 
     def std(self,mx):
@@ -187,7 +194,7 @@ class LSH():
 
 
 
-    def lsh_table(self,data,plane_norms_groups,nbits,num):
+    def lsh_table(self,data,plane_norms_groups,nbits,num,is_dp_lsh=False):
         '''
             进行hash映射,构建哈希表
             Args:
@@ -195,6 +202,8 @@ class LSH():
                 plane_norms_groups:哈希映射函数
                 nbits:哈希编码数
                 num:哈希表的表数
+            return:
+                映射完后的哈希表lshTable
         '''
         # print("当前的nbits为:",nbits)
         value = data.values
@@ -224,6 +233,15 @@ class LSH():
             # 这里对用户进行排序，之后np索引时就不需要根据用户索引来查找数据了
             for k in buckets.keys():  
                 buckets[k] = sorted(buckets[k])
+            # 是否进行对模型进行随机化响应操作，使其满足差分隐私
+            if is_dp_lsh:
+                temp = 1
+                for te in list(buckets.keys()):
+                    if temp % 6 == 0:
+                        temp_num = bin(random.randint(0,5000))[2::]
+                        buckets[temp_num] = buckets[te]
+                        del buckets[str(te)]    
+                    temp += 1
             lshTable[i] = buckets
             i += 1
         return lshTable
@@ -254,19 +272,22 @@ class LSH():
             up_latitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['latitude'])
             up_longitude += sim_score*np.mean(self.user_mx.loc[tup[0]]['longitude'])
         if down == 0:
-            print("down is 0")
+            #print("down is 0")
             return 0
         la_score = up_latitude/down
         long_score = up_longitude/down
 
         tem = self.sig_mae(la_score,self.data.loc[i,'latitude'])
+        #print(tem)
         if tem < self.data.loc[i,'la_MAE']:
             self.data.loc[i,'predict_latitude'] = la_score 
             self.data.loc[i,'la_MAE'] = tem
+        #print(tem)
         tem = self.sig_mae(long_score,self.data.loc[i,'longitude'])
         if tem < self.data.loc[i,'long_MAE']:
             self.data.loc[i,'predict_latitude'] = long_score 
             self.data.loc[i,'long_MAE'] = tem   
+        #print(tem)
 
 import time
 if __name__ == "__main__":
@@ -343,7 +364,7 @@ if __name__ == "__main__":
             data['predict_latitude'],data['predict_longitude'],data['la_MAE'],data['long_MAE'] = 0,0,data['latitude'],data['longitude'].abs()
             # print(data)
             hash_func = lsh_cal.hash_function(num,nbits,d) # hash映射函数
-            lshTable = lsh_cal.lsh_table(train_data,hash_func,nbits,num) # 构建hash表
+            lshTable = lsh_cal.lsh_table(train_data,hash_func,nbits,num,True) # 构建hash表
             te_lshTable = lsh_cal.lsh_table(test_data,hash_func,nbits,num)
             
             lsh_mean_mae,lsh_time = train_LSH(train_data,test_data,user_mx)
@@ -352,6 +373,8 @@ if __name__ == "__main__":
             print("++++++++++++++这是分割线+++++++++++++")
         # start += 2000
 
+    
+    
     
     print("mae:",mae)
     print("times:",times)

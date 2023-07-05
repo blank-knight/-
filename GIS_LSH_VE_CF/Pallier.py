@@ -91,11 +91,11 @@ class Pallier:
 
 if __name__ == "__main__":
     test = Pallier()
-    m = 8800000
+    m = 880
     gLambda,gMu = test.private_key()
     cipher = test.encrypt(m)
     mess = test.decrypt(cipher,gLambda,gMu)
-    m1 = 2000000
+    m1 = 800
     test.cout(gLambda,gMu,cipher,mess,m1)
     mess1 = test.add_homo(cipher,m1,gLambda,gMu)
     test.condition()

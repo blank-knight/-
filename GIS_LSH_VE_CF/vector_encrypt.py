@@ -5,13 +5,12 @@ import numpy as np
 class vector_encrypt:
     '''
         S 表示密钥/私钥的矩阵。用于解密。
-        M 公钥。用于加密和进行数学运算。在有些算法中，不是所有数学运算都需要公钥。但这一算法非常广泛地使用公钥。
+        M 公钥。
         c 加密数据向量，密文。
-        x 消息，即明文。有些论文使用m作明文的变量名。
-        w 单个“加权（weighting）”标量变量，用于重加权输入消息x（让它一致地更长或更短）。这一变量用于调节信噪比。加强信号后，对于给定的操作而言，
-        消息较不容易受噪声影响。然而，过于加强信号，会增加完全毁坏数据的概率。这是一个平衡。
-        E或e 一般指随机噪声。在某些情形下，指用公钥加密数据前添加的噪声。一般而言，噪声使解密更困难。噪声使同一消息的两次加密可以不一样，
-        在让消息难以破解方面，这很重要。注意，取决于算法和实现，这可能是一个向量，也可能是一个矩阵。在其他情形下，指随操作积累的噪声。
+        x 消息，即明文。
+        w 单个“加权（weighting）”标量变量，用于调节信噪比。加强信号后，对于给定的操作而言，消息较不容易受噪声影响。然而，过于加强信号，会增加完全毁坏数据的概率。
+        E或e 噪声使解密更困难且让同一消息的两次加密可以不一样，
+        在让消息难以破解方面,取决于算法和实现，这可能是一个向量，也可能是一个矩阵。在其他情形下，指随操作积累的噪声。
     '''
     def __init__(self) -> None:
         pass
@@ -30,14 +29,14 @@ class vector_encrypt:
     def decrypt(self,c,S,w):
         return (S.dot(c) / w).astype('int')
 
-    def mx_encrypt(self,mx,w,m,n,T):
+    def mx_encrypt(self,mx,w,M,m,l,T):
         '''
             传入矩阵和加密算法对象，返回加密后的矩阵和密钥
         '''
         encrypt_mx = np.zeros([2,mx.shape[1]+1])
-        c,S = self.encrypt_via_switch(mx[0,:],w,m,n,T)
+        c,S = self.encrypt_via_switch(mx[0,:],w,M,m,l,T)
         encrypt_mx[0,:] = c
-        c,S = self.encrypt_via_switch(mx[1,:],w,m,n,T)
+        c,S = self.encrypt_via_switch(mx[1,:],w,M,m,l,T)
         encrypt_mx[1,:] = c
         return encrypt_mx,S
 
@@ -63,16 +62,20 @@ class vector_encrypt:
             c_star[(i * l) + (l-len(b)): (i+1) * l] += b
         return c_star
 
+    
     def switch_key(self,c,S,m,n,T):
         l = int(np.ceil(np.log2(np.max(np.abs(c)))))
-        c_star = self.get_c_star(c,m,l)
         S_star = self.get_S_star(S,m,n,l)
         n_prime = n + 1
-
-        S_prime = np.concatenate((np.eye(m),T.T),0).T
+        
         A = (np.random.rand(n_prime - m, n*l) * 10).astype('int')
         E = (1 * np.random.rand(S_star.shape[0],S_star.shape[1])).astype('int')
         M = np.concatenate(((S_star - T.dot(A) + E),A),0)
+        return M,l
+    
+    def c_S_prime(self,c,M,m,l,T):
+        c_star = self.get_c_star(c,m,l)
+        S_prime = np.concatenate((np.eye(m),T.T),0).T
         c_prime = M.dot(c_star)
         return c_prime,S_prime
 
@@ -94,29 +97,29 @@ class vector_encrypt:
         T = (10 * np.random.rand(n,n_prime - n)).astype('int')
         return T
 
-    def encrypt_via_switch(self,x,w,m,n,T):
+    def encrypt_via_switch(self,x,w,M,m,l,T):
         '''
             返回c',S'
         '''
-        c,S = self.switch_key(x*w,np.eye(m),m,n,T)
+        c,S = self.c_S_prime(x*w,M,m,l,T)
         return c,S
 
 if __name__ == '__main__':
     import math
-    user1Items1 = np.array([np.array([ 0.29908732,-0.95422575])
-            ,np.array([ 0.32160848,-0.94687274])
-            ,np.array([ 0.32329121,-0.94629953])
-            ,np.array([ 0.3240757 ,-0.94603115])
-            ,np.array([ 0.32110942,-0.9470421 ])
-            ,np.array([ 0.32360346,-0.94619279])
-            ,np.array([ 0.32330386,-0.9462952 ])
-            ,np.array([ 0.32360346,-0.94619279])
-            ,np.array([ 0.32404591,-0.94604136])
-            ,np.array([ 0.32159669,-0.94687674])
-            ,np.array([ 0.32319336,-0.94633295])
-            ,np.array([ 0.32360346,-0.94619279])
-            ,np.array([ 0.32329121,-0.94629953])
-            ,np.array([ 0.2989097 ,-0.9542814 ])])
+    user1Items1 = np.array([np.array([ 0.219908732,-0.95422575])
+                ,np.array([ 0.3160848,-0.94687274])
+                ,np.array([ 0.22329121,-0.94629953])
+                ,np.array([ 0.3240757 ,-0.94603115])
+                ,np.array([ 0.32110942,-0.9470421 ])
+                ,np.array([ 0.32360346,-0.94619279])
+                ,np.array([ 0.42330386,-0.9462952 ])
+                ,np.array([ 0.32360346,-0.94619279])
+                ,np.array([ 0.3404591,-0.94604136])
+                ,np.array([ 0.32159669,-0.94687674])
+                ,np.array([ 0.32319336,-0.94633295])
+                ,np.array([ 0.32360346,-0.94619279])
+                ,np.array([ 0.32329121,-0.94629953])
+                ,np.array([ 0.2989097 ,-0.9542814 ])])
 
     user2Items1 = np.array([np.array([ 0.219908732,-0.95422575])
                 ,np.array([ 0.3160848,-0.94687274])
@@ -133,28 +136,34 @@ if __name__ == '__main__':
                 ,np.array([ 0.32329121,-0.94629953])
                 ,np.array([ 0.2989097 ,-0.9542814 ])])
 
-    user1Items1_tem = user1Items1*1e+7
+    user1Items1_tem = user1Items1*1e+2
     user1Items1_tem = user1Items1_tem.T.astype(int)
     print(user1Items1_tem)
     user1Items1_tem = user1Items1.T
     user1Items1_tem = user1Items1_tem*1e+7
     user1Items1_tem = user1Items1_tem.astype(int)
-    print(user1Items1_tem)
 
     user1Items2_tem = user2Items1.T
     user1Items2_tem = user1Items2_tem*1e+7
     user1Items2_tem = user1Items2_tem.astype(int)
     vec_encrypt = vector_encrypt()
     x = user1Items1_tem
-    m = x.shape[1]
+    m = 2
     n = m
     w = 16
     S = vec_encrypt.generate_key(w,m,n)
     T = vec_encrypt.get_T(n)
+    M,l = vec_encrypt.switch_key(x*w,np.eye(m),m,n,T)
     # c,S = vec_encrypt.encrypt_via_switch(x,w,m,n,T)
-    c1,S = vec_encrypt.mx_encrypt(x,w,m,n,T)
+    c1,S = vec_encrypt.mx_encrypt(x,w,M,m,l,T)
     x = user1Items2_tem
-    c2,S = vec_encrypt.mx_encrypt(x,w,m,n,T)
+    c2,S = vec_encrypt.mx_encrypt(x,w,M,m,l,T)
+
+    c11 = vec_encrypt.mx_decrypt(c1,S,w)
+    #print(c11)
+    print(user1Items2_tem)
+    c22 = vec_encrypt.mx_decrypt(c2,S,w)
+    print(c22)
     # print(vec_encrypt.mx_decrypt(c,S,w))
     # print(user1Items1_tem[0])
     # vec_encrypt = vector_encrypt()

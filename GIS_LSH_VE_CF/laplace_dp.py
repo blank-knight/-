@@ -4,9 +4,9 @@ import numpy as np
 # epsilon越小，噪声越大，误差越大
 # sensitivety/epsilon为满足epsilon-差分隐私，其比值越大，噪声越大，误差越大
 sensitivety = 1 
-epsilon = 10
+epsilon = 500
 
-class laplace_dp():
+class laplace_dp:
     def __init__(self) -> None:
         pass
 
