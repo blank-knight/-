@@ -32,7 +32,7 @@ class LSH():
     """
         局部敏感哈希的实现
     """
-    def __init__(self,user_mx,data,vec_encrypt=None,laplaceDP=None) -> None:
+    def __init__(self,user_mx,data,l,vec_encrypt=None,laplaceDP=None) -> None:
             '''
                 初始化,生成加密算法需要的参数
                 Args:
@@ -45,14 +45,16 @@ class LSH():
             self.user_mx = user_mx
             self.data = data
             self.vec_encrypt = vec_encrypt
-            self.m = 2
+            # m还需修改
+            self.m = user_mx.shape[1]
             self.n =self.m
-            self.w = 16
-            self.S = self.vec_encrypt.generate_key(self.w,self.m,self.n)
-            self.T = self.vec_encrypt.get_T(self.n)
-            self.x = np.array(np.array([ 0.29908732,-0.95422575]))*1e+7
-            self.x = self.x.T.astype(int)
-            self.M,self.l = vec_encrypt.switch_key(self.x*self.w,np.eye(self.m),self.m,self.n,self.T)
+            self.l = l
+            self.w = 160
+            self.S = self.vec_encrypt.generate_key(self.w,self.m)
+            self.T = self.vec_encrypt.get_T(self.m)
+            self.S_prime = self.vec_encrypt.get_S_prime(self.m,self.T)
+            self.M = self.vec_encrypt.switch_key(self.S,self.m,self.T,self.l)
+            self.e = self.vec_encrypt.generate_noise(self.m)
             self.gLambda,self.gMu = self.pailler.private_key()
 
 
@@ -97,23 +99,41 @@ class LSH():
         user1Items = self.std(user1Items.astype('float'))
         user2Items = self.std(user2Items.astype('float'))
         end_time = time.time()
-        c1,S = self.mx_encrypt(user1Items,self.w,self.M,self.m,self.l,self.T)
-        c2,S = self.mx_encrypt(user2Items,self.w,self.M,self.m,self.l,self.T)
+        c1_star = self.mx_encrypt(user1Items)
+        c2_star = self.mx_encrypt(user2Items)
         total_time = end_time-start_time
         start_time = time.time()
-        res = (userId2,1/(1+math.sqrt(np.sum(self.vec_encrypt.mx_decrypt((c1-c2),S,self.w)**2))/user1Items.shape[0])) 
+        mx_dec = np.zeros([user1Items.shape[0],user1Items.shape[1]])
+        for i in range(user1Items.shape[1]):
+            # 同态运算后解密
+            mx_dec[:,i] = self.vec_encrypt.mx_decrypt(self.S_prime,self.M,(c1_star[:,i]-c2_star[:,i]),self.w)
+        res = (userId2,1/(1+math.sqrt(np.sum(mx_dec)**2))/user1Items.shape[0])
         end_time = time.time()
         total_time += (end_time-start_time)
         return res,total_time
 
-    def mx_encrypt(self,mx,w,M,m,l,T):
+    def mx_encrypt(self,mx):
         '''
-            对矩阵进行预处理和加密
+            对矩阵进行预处理加密
+            Args:
+                S 表示密钥/私钥的矩阵。用于解密。
+                M 公钥。用于加密和进行数学运算。在有些算法中，不是所有数学运算都需要公钥。但这一算法非常广泛地使用公钥。
+                c 加密数据向量，密文。
+                x 消息，即明文。有些论文使用m作明文的变量名。
+                w 单个“加权（weighting）”标量变量，用于重加权输入消息x（让它一致地更长或更短）。这一变量用于调节信噪比。加强信号后，对于给定的操作而言，
+                消息较不容易受噪声影响。然而，过于加强信号，会增加完全毁坏数据的概率。这是一个平衡。
+                E或e 一般指随机噪声。在某些情形下，指用公钥加密数据前添加的噪声。一般而言，噪声使解密更困难。噪声使同一消息的两次加密可以不一样，
+                在让消息难以破解方面，这很重要。注意，取决于算法和实现，这可能是一个向量，也可能是一个矩阵。在其他情形下，指随操作积累的噪声。
+            return:
+                c*和S*
         '''
         mx_tem = mx*1e+7
         mx_tem = mx_tem.T.astype(int)
-        c,S = self.vec_encrypt.mx_encrypt(mx_tem,w,M,m,l,T)
-        return c,S
+        c_star = np.zeros([self.l * self.m,mx.shape[1]], dtype='int')
+        for i in range(mx.shape[1]):
+            c = self.vec_encrypt.mx_encrypt(mx[:,i],self.S,self.w,self.e)
+            c_star[:,i] = self.vec_encrypt.get_c_star(c,self.m,self.l)
+        return c_star
 
     def std(self,mx):
         '''
@@ -283,6 +303,41 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     plt.rcParams['font.sans-serif']=['SimHei'] #用来正常显示中文标签
     plt.rcParams['axes.unicode_minus']=False #用来正常显示负号
+
+    def train_encrypt_LSH(test_data,te_lshTable,lshTable):
+        global data,lsh_cal
+        testIndex = test_data.index
+        topk,count,length,num = 3,0,len(testIndex),-1
+        # print("测试集LSH为:",lsh_cal.lsh_detect(te_lshTable))
+        # print("训练集集LSH为:",lsh_cal.lsh_detect(lshTable))
+        res_time = 0
+        start_time = time.time()
+        for table_num in te_lshTable.values(): # 遍历测试集的每个表,这里默认设置的一个表
+            num += 1
+            print("当前表数为:",num)
+            for buckets in table_num: # 遍历当前表的hash桶
+                if buckets not in lshTable[num].keys():
+                        continue
+                for test_id in te_lshTable[num][buckets]: # 遍历当前表当前桶里的测试集用户和训练集用户
+                    count += 1
+                    print("当前进度是:",count/length)
+                    sim_lis = []
+                    end_time = time.time()
+                    res_time += end_time-start_time
+                    for train_id in lshTable[num][buckets]: # 遍历训练集hash映射后同一个表，同一个桶下的数据
+                        sim_res,time_count = lsh_cal.encrypt_calSim(test_id,train_id)
+                        res_time += time_count
+                        sim_lis.append(sim_res)
+                    start_time = time.time()
+                    te = sorted(sim_lis,key=lambda x:x[1],reverse=True)[2:topk]
+                    lsh_cal.lsh_mae(test_id,te)
+                    end_time = time.time()
+                    res_time += end_time-start_time
+        la_mae,long_mae = data['la_MAE'].mean(),data['long_MAE'].mean()
+        mean_mae = (la_mae+long_mae)/2
+        print('测试集long_mae为{0},测试集la_mae为{1},测试集mean_mae为{2}'.format(long_mae,la_mae,mean_mae))
+        return mean_mae,res_time
+    
     def train_LSH(train_data,test_data,user_mx):
         global data,lsh_cal
         testIndex = test_data.index
@@ -298,7 +353,7 @@ if __name__ == "__main__":
                         continue
                 for test_id in te_lshTable[num][buckets]: # 遍历当前表当前桶里的测试集用户和训练集用户
                     count += 1
-                    # print("当前进度是:",count/length)
+                    print("当前进度是:",count/length)
                     sim_lis = []
                     
                     for train_id in lshTable[num][buckets]: # 遍历训练集hash映射后同一个表，同一个桶下的数据
@@ -343,7 +398,10 @@ if __name__ == "__main__":
     nbits_lis,num_lis,d = [10,20,30,40,50,60,70,80,90,100],2,2
     # 实例化
     vec_encrypt = vector_encrypt()
-    lsh_cal = LSH(user_mx,data,vec_encrypt)
+    # l = int(np.ceil(np.log2(np.max(np.abs(user_mx)))))
+    # print(l)
+    l = 35 # 最大数据的编码长度
+    lsh_cal = LSH(user_mx,data,l,vec_encrypt)
     laplaceDp = laplace_dp()
     start = 0
     num = num_lis
@@ -355,12 +413,14 @@ if __name__ == "__main__":
             hash_func = lsh_cal.hash_function(num,nbits,d) # hash映射函数
             lshTable = lsh_cal.lsh_table(train_data,hash_func,nbits,num,True) # 构建hash表
             te_lshTable = lsh_cal.lsh_table(test_data,hash_func,nbits,num)
-            
-            lsh_mean_mae,lsh_time = train_LSH(train_data,test_data,user_mx)
+            # lsh_mean_mae,lsh_time = train_LSH(train_data,test_data,user_mx)
+            lsh_mean_mae,lsh_time = train_encrypt_LSH(train_data,te_lshTable,lshTable)
             mae.append(lsh_mean_mae)
             times.append(lsh_time)
             print("++++++++++++++这是分割线+++++++++++++")
         # start += 2000
+
+  
 
     
     
